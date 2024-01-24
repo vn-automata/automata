@@ -23,9 +23,9 @@ import bittensor as bt
 from abc import ABC, abstractmethod
 
 # Sync calls set weights and also resyncs the metagraph.
-from template.utils.config import check_config, add_args, config
-from template.utils.misc import ttl_get_block
-from template import __spec_version__ as spec_version
+from cell_automata.utils.config import check_config, add_args, config
+from cell_automata.utils.misc import ttl_get_block
+from cell_automata import __spec_version__ as spec_version
 
 
 class BaseNeuron(ABC):
@@ -91,9 +91,7 @@ class BaseNeuron(ABC):
         self.check_registered()
 
         # Each miner gets a unique identity (UID) in the network for differentiation.
-        self.uid = self.metagraph.hotkeys.index(
-            self.wallet.hotkey.ss58_address
-        )
+        self.uid = self.metagraph.hotkeys.index(self.wallet.hotkey.ss58_address)
         bt.logging.info(
             f"Running neuron on subnet: {self.config.netuid} with uid {self.uid} using network: {self.subtensor.chain_endpoint}"
         )

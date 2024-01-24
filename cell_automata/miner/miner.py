@@ -1,5 +1,4 @@
 # The MIT License (MIT)
-# Copyright © 2023 Yuma Rao
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 # documentation files (the “Software”), to deal in the Software without restriction, including without limitation
@@ -23,7 +22,7 @@ import traceback
 
 import bittensor as bt
 
-from template.base.neuron import BaseNeuron
+from cell_automata.miner.neuron import BaseNeuron
 
 
 class BaseMinerNeuron(BaseNeuron):
@@ -201,9 +200,7 @@ class BaseMinerNeuron(BaseNeuron):
             )
 
         except Exception as e:
-            bt.logging.error(
-                f"Failed to set weights on chain with exception: { e }"
-            )
+            bt.logging.error(f"Failed to set weights on chain with exception: { e }")
 
         bt.logging.info(f"Set weights: {chain_weights}")
 
