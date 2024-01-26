@@ -65,11 +65,7 @@ class Rule30(ApplyRule):
     """Implementation of a one-dimensional cellular automaton rule introduced by Stephen Wolfram,
     known for its chaotic behavior."""
 
-    def rule_function(self, n, c, t):
-        # Ensure the neighborhood is a 1D array with 3 elements
-        assert n.shape == (3,)
-
-        # Apply Rule 30
+    def rule_function(self, n: NDArray, c: int, t: int) -> int:
         return cpl.nks_rule(n, 30)
 
 
@@ -77,7 +73,7 @@ class Rule110(ApplyRule):
     """Implementation of Rule 110: It's another one-dimensional cellular automaton rule,
     introduced by Stephen Wolfram. It's known for being Turing complete."""
 
-    def rule_function(self, n, c, t):
+    def rule_function(self, n: NDArray, c: int, t: int) -> int:
         return cpl.nks_rule(n, 110)
 
 
@@ -197,6 +193,36 @@ class Simulate:
         return ca
 
 
+class Simulate1D:
+    """Main simulation runner for 1D CA used in miner and validator routines"""
+
+    def __init__(
+        self,
+        ca: NDArray[np.float32],
+        timesteps: int,
+        rule_instance: ApplyRule,
+        r: int = 1,
+    ):
+        self.ca = ca
+        self.timesteps = timesteps
+        self.rule_instance = rule_instance
+        self.r = r
+
+    def run(self) -> NDArray[Any]:
+        try:
+            ca = cpl.evolve(
+                cellular_automaton=self.ca,
+                timesteps=self.timesteps,
+                apply_rule=self.rule_instance.rule_function,
+                r=self.r,
+            )
+        except Exception as e:
+            raise RuntimeError(f"Error running simulation.") from e
+
+        cpl.plot(ca)
+        return ca
+
+
 # Test rules with Simulate class
 if __name__ == "__main__":  #
     initial_state = cpl.init_simple2d(60, 60)
@@ -215,6 +241,20 @@ if __name__ == "__main__":  #
         timesteps=100,
         rule_instance=rule_instance,
         neighbourhood_type="Moore",
+        r=1,
+    )
+    result = sim.run()
+    print(result)
+
+
+# Test rules with Simulate1D class
+if __name__ == "__main__":
+    initial_state = cpl.init_simple(100)
+    rule_instance = Rule30()
+    sim = Simulate1D(
+        initial_state,
+        timesteps=100,
+        rule_instance=rule_instance,
         r=1,
     )
     result = sim.run()

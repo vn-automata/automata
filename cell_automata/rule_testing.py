@@ -9,18 +9,16 @@ import subprocess
 
 
 
-# Initialize a 2D cellular automaton with a simple state
-initial_state = cpl.init_simple2d(60, 60)
+initial_state = cpl.init_simple(100)
 
 # Create an instance of ConwayRule
 rule_instance = Rule30()
 
 # Create an instance of Simulate with ConwayRule
-sim = Simulate(
+sim = Simulate1D(
     initial_state,
     timesteps=100,
     rule_instance=rule_instance,
-    neighbourhood_type="Moore",
     r=1,
 )
 
