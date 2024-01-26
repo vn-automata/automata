@@ -38,7 +38,13 @@ class ConwayRule(ApplyRule):
     the cell dies or remains dead."""
 
     def rule_function(self, n, c, t):
-        sum_n = np.sum(n)
+        # Ensure the neighborhood is a 3x3 array
+        assert n.shape == (3, 3)
+        
+        # Calculate the sum of the neighbors, excluding the current cell
+        sum_n = np.sum(n) - c
+
+        # Apply the rules of Conway's Game of Life
         return int(c and 2 <= sum_n <= 3 or sum_n == 3)
 
 
