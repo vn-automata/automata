@@ -16,9 +16,9 @@
 
 import bittensor as bt
 
-from cell_automata.protocol import Dummy
-from cell_automata.validator.reward import get_rewards
-from cell_automata.utils.uids import get_random_uids
+from automata.protocol import Dummy
+from automata.validator.reward import get_rewards
+from automata.utils.uids import get_random_uids
 
 
 async def forward(self):
