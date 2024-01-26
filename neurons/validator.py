@@ -14,47 +14,114 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-
+import os
 import time
+import random
 
-# Bittensor
+import numpy as np
 import bittensor as bt
+import cellpylib as cpl
 
-# Bittensor Validator Template:
-import cell_automata
-from cell_automata.validator import forward
-
-# import base validator class which takes care of most of the boilerplate
-from cell_automata.validator.validator import BaseValidatorNeuron
+import automata
+from automata.utils import rulesets
+from automata.protocol import CAsynapse
+from automata.utils.uids import get_random_uids
+from automata.validator import forward
+from automata.validator.reward import get_rewards, reward
+from automata.validator.validator import BaseValidatorNeuron
 
 
 class Validator(BaseValidatorNeuron):
-    """
-    Your validator neuron class. You should use this class to define your validator's behavior. In particular, you should replace the forward function with your own logic.
-
-    This class inherits from the BaseValidatorNeuron class, which in turn inherits from BaseNeuron. The BaseNeuron class takes care of routine tasks such as setting up wallet, subtensor, metagraph, logging directory, parsing config, etc. You can override any of the methods in BaseNeuron if you need to customize the behavior.
-
-    This class provides reasonable default behavior for a validator such as keeping a moving average of the scores of the miners and using them to set weights at the end of each epoch. Additionally, the scores are reset for new hotkeys at the end of each epoch.
-    """
-
+    
     def __init__(self, config=None):
         super(Validator, self).__init__(config=config)
 
         bt.logging.info("load_state()")
         self.load_state()
 
-        # TODO(developer): Anything specific to your use case you can do here
+    def get_random_params(self):
+        # Generate a random initial state as a 2D numpy array
+        initial_state = np.random.randint(2, size=(10, 10))
+
+        # Choose a random number of steps
+        steps = random.randint(50, 100)
+
+        # Choose a random rule function. There should be a better way than adding new strings each time!
+        rule_funcs = [
+                "Conway",
+                "HighLife",
+                "DayAndNight",
+            ]
+        rule_func = random.choice(rule_funcs)
+
+        # Choose a random neighborhood function. There should be a better way than adding new strings each time!
+        neighborhood_funcs = ["Moore", "Von Neumann"]
+        neighborhood_func = random.choice(neighborhood_funcs)
+            
+        # Log and return the parameters.
+        if initial_state is not None and steps is not None and rule_func is not None and neighborhood_func is not None:
+            bt.logging.info(
+                f"Generated cellular automata parameters: {initial_state}, {steps}, {rule_func}, {neighborhood_func}"
+            )
+        return initial_state, steps, rule_func, neighborhood_func
+    
+    
+    def query_automata_miners(self, initial_state, steps, rule_func, neighborhood_func):
+        miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
+        responses = self.dendrite.query(
+            axons=[self.metagraph.axons[uid] for uid in miner_uids],
+            synapse=CAsynapse(
+                initial_state,
+                steps, 
+                rule_func, 
+                neighborhood_func),
+            deserialize=True,
+        )
+        return responses, miner_uids
+    
+    
+    def compute_scores(self, responses):
+        outputs = [response.payload for response in responses]
+        bt.logging.info(f"Received responses: {outputs}")
+        scores = [np.sum(output) for output in outputs]
+        scores = np.array(scores) / np.sum(scores)
+        return scores
 
     async def forward(self):
         """
-        Validator forward pass. Consists of:
         - Generating the query
         - Querying the miners
         - Getting the responses
         - Rewarding the miners
         - Updating the scores
         """
-        # TODO(developer): Rewrite this function based on your protocol definition.
+                # Sync with the metagraph and get the miner uids.
+        self.sync()
+           
+        # Get the params for the CA simulation.
+        initial_state, steps, rule_func, neighborhood_func = self.get_random_params()
+        bt.logging.info(f"Params: {initial_state}, {steps}, {rule_func}, {neighborhood_func}")
+        
+        # Query the network for the CA simulation results.
+        responses = self.query_network(initial_state, steps, rule_func, neighborhood_func)
+        miner_uids = []
+        bt.logging.info(f"Responses: {responses}")
+        
+        # Get the rewards for the responses.
+        rewards = get_rewards(self, query=self.step, responses=responses)
+        bt.logging.info(f"Scored responses: {rewards}")
+        
+        # Update the scores based on the rewards.
+        self.compute_scores(rewards)
+        self.update_scores(rewards, miner_uids)
+        
+        # Save the state.
+        self.save_state()
+        
+
+        
+        
+        
         return await forward(self)
 
 

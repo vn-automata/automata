@@ -24,7 +24,9 @@ import bittensor as bt
 from typing import List
 from traceback import print_exception
 
-from cell_automata.miner.neuron import BaseNeuron
+from automata.protocol import spec_version
+from automata.miner.config import check_config, add_args, config
+from automata.miner.neuron import BaseNeuron
 
 
 class BaseValidatorNeuron(BaseNeuron):
