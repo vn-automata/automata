@@ -14,14 +14,13 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-import re
-import os
 import codecs
-import pathlib
-from os import path
+import os
+import re
 from io import open
-from setuptools import setup, find_packages
-from pkg_resources import parse_requirements
+from os import path
+
+from setuptools import find_packages, setup
 
 
 def read_requirements(path):
@@ -60,16 +59,16 @@ with codecs.open(
     version_string = version_match.group(1)
 
 setup(
-    name="bittensor_subnet_template",
+    name="bt-automata",
     version=version_string,
-    description="bittensor_subnet_template",
+    description="Bittensor cellular automata",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/opentensor/bittensor-subnet-template",
-    author="",
+    url="https://github.com/vn-automata/automata",
+    author="https://github.com/vn-automata",
     packages=find_packages(),
     include_package_data=True,
-    author_email="",
+    author_email="dev@deratta.org",
     license="MIT",
     python_requires=">=3.8",
     install_requires=requirements,
