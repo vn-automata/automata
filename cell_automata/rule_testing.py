@@ -34,9 +34,15 @@ print(result)
 
 #subprocess.run(['feh', '/root/automata1/sim_figs/simulation_result.png'])
 
-# Convert the numpy array to ASCII art
-initial_ascii = '\n'.join(''.join('.' if cell else '#' for cell in row) for row in initial_state[-1])
-final_ascii = '\n'.join(''.join('.' if cell else '#' for cell in row) for row in result[-1])
+# Convert the numpy 2D array to ASCII art
+#initial_ascii = '\n'.join(''.join('.' if cell else '#' for cell in row) for row in initial_state[-1])
+#final_ascii = '\n'.join(''.join('.' if cell else '#' for cell in row) for row in result[-1])
+
+# Convert the numpy 1D array to ASCII artv for all timesteps
+final_ascii = '\n'.join(''.join('.' if cell else '#' for cell in row) for row in result)
+
+
+
 
 # Print the ASCII art
 print(initial_ascii)
