@@ -39,7 +39,7 @@ class ConwayRule(ApplyRule):
 
     def rule_function(self, n, c, t):
         sum_n = np.sum(n)
-        return np.logical_or(np.logical_and(c, np.logical_and(2 <= sum_n, sum_n <= 3)), sum_n == 3)
+        return int(c and 2 <= sum_n <= 3 or sum_n == 3)
 
 
 class HighLifeRule(ApplyRule):
