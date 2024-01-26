@@ -38,13 +38,7 @@ class ConwayRule(ApplyRule):
     the cell dies or remains dead."""
 
     def rule_function(self, n, c, t):
-        # Ensure the neighborhood is a 3x3 array
-        assert n.shape == (3, 3)
-        
-        # Calculate the sum of the neighbors, excluding the current cell
-        sum_n = np.sum(n) - c
-
-        # Apply the rules of Conway's Game of Life
+        sum_n = np.sum(n)
         return int(c and 2 <= sum_n <= 3 or sum_n == 3)
 
 
@@ -54,8 +48,8 @@ class HighLifeRule(ApplyRule):
     """
 
     def rule_function(self, n, c, t):
-        sum_n = sum(n)
-        return c and 2 <= sum_n <= 3 or sum_n == 6
+        sum_n = np.sum(n)
+        return int(c and 2 <= sum_n <= 3 or sum_n == 6)
 
 
 class DayAndNightRule(ApplyRule):
@@ -63,7 +57,7 @@ class DayAndNightRule(ApplyRule):
     that also gives birth to a cell if there are 3, 6, 7, or 8 neighbors."""
 
     def rule_function(self, n, c, t):
-        sum_n = sum(n)
+        sum_n = np.sum(n)
         return sum_n in (3, 6, 7, 8) or c and sum_n in (4, 6, 7, 8)
 
 
@@ -72,6 +66,10 @@ class Rule30(ApplyRule):
     known for its chaotic behavior."""
 
     def rule_function(self, n, c, t):
+        # Ensure the neighborhood is a 1D array with 3 elements
+        assert n.shape == (3,)
+
+        # Apply Rule 30
         return cpl.nks_rule(n, 30)
 
 

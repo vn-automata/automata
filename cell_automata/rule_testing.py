@@ -13,12 +13,12 @@ import subprocess
 initial_state = cpl.init_simple2d(60, 60)
 
 # Create an instance of ConwayRule
-rule_instance = ConwayRule()
+rule_instance = Rule30()
 
 # Create an instance of Simulate with ConwayRule
 sim = Simulate(
     initial_state,
-    timesteps=5,
+    timesteps=100,
     rule_instance=rule_instance,
     neighbourhood_type="Moore",
     r=1,
