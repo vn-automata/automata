@@ -15,247 +15,205 @@
 # DEALINGS IN THE SOFTWARE.
 
 
-from typing import Any, Callable
+import json
+import typing
+import hashlib
+import pydantic
 import numpy as np
-from numpy.typing import NDArray
-import cellpylib as cpl
 import bittensor as bt
-from abc import ABC, abstractmethod
 
 
-class ApplyRule(ABC):
-    """Abstract class for application of cellular automata rules"""
-
-    @abstractmethod
-    def rule_function(self, n, c, t):
-        pass
-
-
-class ConwayRule(ApplyRule):
-    """Implementation of Conway's Game of Life:
-    a cellular automaton where a cell is "born" if it has exactly three neighbors,
-    and a cell "survives" if it has exactly two or three neighbors. Otherwise,
-    the cell dies or remains dead."""
-
-    def rule_function(self, n, c, t):
-        sum_n = np.sum(n)
-        return int(c and 2 <= sum_n <= 3 or sum_n == 3)
+class IsAlive(bt.Synapse):
+    answer: typing.Optional[str] = None
+    completion: str = pydantic.Field(
+        ...,
+        title="Completion",
+        description="Completion status of the current request.",
+    )
 
 
-class HighLifeRule(ApplyRule):
-    """Implementation of Game of Life HighLife:
-    a variant of Conway's Game of Life that also gives birth to a cell if there are 6 neighbors.
+class CAsynapse(bt.Synapse):
+    """
+    Communication protocol for cellular automata simulation.
+    It is a simple request-response protocol where the validator transmits a set of parameters
+    to the miner for initialization of a cellular automata simulation. The  miner responds with the
+    transformed data upon completion.
+
+    Attributes:
+    - array_bytes (bytes): The serialized initial state of the cellular automata sent to the miner.
+    - metadata_bytes (bytes): The serialized metadata of the cellular automata parameters sent to the miner.
+    - automaton_bytes (bytes): The serialized evolved automaton to return to the validator.
+    - automaton_metadata_bytes (bytes): The serialized metadata of the evolved automaton to return to the validator.
+
+    Methods:
+    - serialize_parameters: Serialize the initial state and starting parameters for transmission.
+    - deserialize_parameters: Deserialize the initial state and starting parameters from transmission.
+    - serialize_automaton: Serialize the evolved automaton for transmission.
+    - deserialize_automaton: Deserialize the evolved automaton from transmission.
     """
 
-    def rule_function(self, n, c, t):
-        sum_n = np.sum(n)
-        return int(c and 2 <= sum_n <= 3 or sum_n == 6)
+    array_bytes: typing.Optional[bytes] = None
+    metadata_bytes: typing.Optional[bytes] = None
+    automaton_bytes: typing.Optional[bytes] = None
+    automaton_metadata_bytes: typing.Optional[bytes] = None
 
-
-class DayAndNightRule(ApplyRule):
-    """Implementation of Day & Night: a variant of Conway's Game of Life
-    that also gives birth to a cell if there are 3, 6, 7, or 8 neighbors."""
-
-    def rule_function(self, n, c, t):
-        sum_n = np.sum(n)
-        return sum_n in (3, 6, 7, 8) or c and sum_n in (4, 6, 7, 8)
-
-
-class Rule30(ApplyRule):
-    """Implementation of a one-dimensional cellular automaton rule introduced by Stephen Wolfram,
-    known for its chaotic behavior."""
-
-    def rule_function(self, n: NDArray, c: int, t: int) -> int:
-        return cpl.nks_rule(n, 30)
-
-
-class Rule110(ApplyRule):
-    """Implementation of Rule 110: It's another one-dimensional cellular automaton rule,
-    introduced by Stephen Wolfram. It's known for being Turing complete."""
-
-    def rule_function(self, n: NDArray, c: int, t: int) -> int:
-        return cpl.nks_rule(n, 110)
-
-
-class FredkinRule(ApplyRule):
-    """Implementation of Fredkin's is a cellular automaton rule where a cell is "born" if it has exactly one neighbor,
-    and a cell "survives" if it has exactly two neighbors. Otherwise, the cell dies or remains dead.
-    """
-
-    def rule_function(self, n, c, t):
-        sum_n = sum(n)
-        return sum_n == 1 or c and sum_n == 2
-
-
-class BriansBrainRule(ApplyRule):
-    """Implementation of Brian's Brain: a three-state simulation.
-    A cell is "born" if it was dead and has exactly two neighbors.
-    A live cell dies in the next generation, and a dead cell remains dead."""
-
-    def rule_function(self, n, c, t):
-        sum_n = sum(n)
-        if c == 0 and sum_n == 2:
-            return 1
-        elif c == 1:
-            return 2
-        elif c == 2:
-            return 0
-
-
-class SeedsRule(ApplyRule):
-    """Implementation of Seeds is a cellular automaton where a cell is "born" if it has exactly two neighbors,
-    and a cell "dies" otherwise."""
-
-    def rule_function(self, n, c, t):
-        sum_n = sum(n)
-        return int(sum_n == 2)
-
-
-class ByteTransfer(bt.Synapse):
-    """A synapse that verifies the integrity of a simulation"""
-
-    @staticmethod
-    def deserialize(bytes: bytes) -> [NDArray[np.float64]]:
+    def serialize_parameters(
+        self,
+        initial_state: np.ndarray,
+        steps: int,
+        rule_func: str,
+        neighborhood_func: str,
+    ) -> typing.Tuple[bytes, bytes]:
         """
-        Deserialize the simulation output. This method retrieves the result of
-        the CA simulation from the miner in the form of simulation_output,
-        deserializes it and returns it as the output of the dendrite.query() call.
-        This should be more efficient for numerical ops than a list
+        Serialize the cellular automata configuration and return the bytes for metadata and array.
+
+        Args:
+            - initial_state (np.ndarray): The initial state of the automata as a numpy array.
+            - steps (int): The number of steps to simulate.
+            - rule_func (str): The rule function as a string.
+            - neighborhood_func (str): The neighborhood function as a string.
 
         Returns:
-        - np.ndarray: The deserialized response, which in this case is the value of simulation_output.
+            typing.Tuple[bytes, bytes]: A tuple containing the serialized metadata, array and hash.
+
+        Raises:
+            ValueError: If any of the parameters are not in the expected format or type.
         """
-        # Check if the data is not None and deserialize it
-        if not isinstance(bytes):
-            raise ValueError("Data must be bytes")
-        if bytes is not None:
-            deserialized = np.frombuffer(bytes, dtype=np.int).reshape(-1, 100)
-            data = deserialized.astype(np.float64)
+        if not isinstance(initial_state, np.ndarray):
+            raise ValueError("initial_state must be a numpy array")
+        if not isinstance(steps, int) or steps <= 0:
+            raise ValueError("steps must be a positive integer")
+        if not isinstance(rule_func, str) or not rule_func:
+            raise ValueError("rule_func must be a non-empty string")
+        if not isinstance(neighborhood_func, str) or not neighborhood_func:
+            raise ValueError("neighborhood_func must be a non-empty string")
 
-            # Validate the deserialized data (if necessary)
+        array_bytes = initial_state.tobytes()
+        array_hash = hashlib.sha256(array_bytes).hexdigest()
 
-            return data
-        return None
+        metadata = {
+            "dtype": str(initial_state.dtype),
+            "shape": initial_state.shape,
+            "hash": array_hash,
+            "steps": steps,
+            "rule_func": rule_func,
+            "neighborhood_func": neighborhood_func,
+        }
 
-    @staticmethod
-    def serialize(data: NDArray[np.float64]) -> bytes:
+        metadata_bytes = json.dumps(metadata).encode("utf-8")
+        return metadata_bytes, array_bytes
+
+    def deserialize_parameters(
+        metadata_bytes: bytes, array_bytes: bytes
+    ) -> typing.Tuple[
+        np.ndarray,
+        typing.Optional[int],
+        typing.Optional[str],
+        typing.Optional[str],
+    ]:
         """
-        Serialize the simulation output. This method serializes the result of
-        the CA simulation and returns it as the output of the dendrite.query() call.
+        Deserialize the parameters and return the cellular automata configuration for running the simulation.
+
+        Args:
+            - metadata_bytes (bytes): The serialized metadata of the cellular automata parameters.
+            - array_bytes (bytes): The serialized initial state of the cellular automata.
 
         Returns:
-        - bytes: The serialized response, which in this case is the value of simulation_output.
+            A tuple containing the configuration parameters for the cellular automata simulation:
+
+            - initial_state (np.ndarray): The initial state of the cellular automata as a numpy array.
+            - steps (int): The number of steps to simulate.
+            - rule_func (str): The rule function as a string.
+            - neighborhood_func (str): The neighborhood function as a string.
+
+        Raises:
+            ValueError: Data integrity error if the array hash does not match the hash in the metadata.
         """
-        # Check if the data is not None and serialize it
-        if not isinstance(data, np.ndarray):
-            raise ValueError("Data must be np.ndarray")
-        if data is not None:
-            serialized = data.tobytes()
 
-            # Validate the serialized data (if necessary)
+        # Deserialize the metadata from bytes to a JSON string and then to a dictionary
+        metadata = json.loads(metadata_bytes.decode("utf-8"))
 
-        return serialized
-    
-class Simulate:
-    """Main simulation runner for CA used in miner and validator routines"""
+        # Verify the integrity of the array bytes using the hash
+        array_hash = hashlib.sha256(array_bytes).hexdigest()
+        if array_hash != metadata.get("hash", ""):
+            raise ValueError("Data integrity check failed!")
 
-    def __init__(
-        self,
-        ca: NDArray[np.float32],
-        timesteps: int,
-        rule_instance: ApplyRule,
-        r: int = 1,
-        neighbourhood_type: str = "Moore",
-    ):
+        # Reconstruct the numpy array using the metadata and the array bytes
+        initial_state = np.frombuffer(array_bytes, dtype=np.dtype(metadata["dtype"]))
+        initial_state = initial_state.reshape(metadata["shape"])
 
-        if neighbourhood_type not in ["Moore", "von Neumann"]:
-            neighbourhood_type = "Moore"  # default to "Moore" if input is not valid
+        # Access other metadata if available
+        steps = metadata.get("steps")
+        rule_func = metadata.get("rule_func")
+        neighborhood_func = metadata.get("neighborhood_func")
 
-        self.ca = ca
-        self.timesteps = timesteps
-        self.rule_instance = rule_instance
-        self.r = r
-        self.neighborhood_type = neighbourhood_type
+        # Return the initial state along with any other optional parameters that were provided
+        return initial_state, steps, rule_func, neighborhood_func
 
-    def run(self) -> NDArray[Any]:
-        try:
-            ca = cpl.evolve2d(
-                cellular_automaton=self.ca,
-                timesteps=self.timesteps,
-                apply_rule=self.rule_instance.rule_function,
-                r=self.r,
-                neighbourhood=self.neighborhood_type,
-            )
-        except Exception as e:
-            raise RuntimeError(f"Error running simulation.") from e
+    def serialize_automaton(self, automaton: np.ndarray) -> bytes:
+        """
+        Serialize the automaton and return the bytes for the automaton and metadata.
 
-        cpl.plot2d_animate(ca)
-        return ca
+        Args:
+            - automaton (np.ndarray): The automaton as a numpy array.
 
+        Returns:
+            - automaton_bytes (bytes): The serialized automaton bytes.
+            - automaton_metadata_bytes (bytes): The serialized automaton metadata bytes.
 
-class Simulate1D:
-    """Main simulation runner for 1D CA used in miner and validator routines"""
+        Raises:
+            - ValueError: If the automaton is not in the expected format or type.
+        """
+        if not isinstance(automaton, np.ndarray):
+            raise ValueError("automaton must be a numpy array")
 
-    def __init__(
-        self,
-        ca: NDArray[np.float32],
-        timesteps: int,
-        rule_instance: ApplyRule,
-        r: int = 1,
-    ):
-        self.ca = ca
-        self.timesteps = timesteps
-        self.rule_instance = rule_instance
-        self.r = r
+        automaton_bytes = automaton.tobytes()
+        automaton_hash = hashlib.sha256(automaton_bytes).hexdigest()
+        automaton_metadata = {
+            "dtype": str(automaton.dtype),
+            "shape": automaton.shape,
+            "hash": automaton_hash,
+        }
 
-    def run(self) -> NDArray[Any]:
-        try:
-            ca = cpl.evolve(
-                cellular_automaton=self.ca,
-                timesteps=self.timesteps,
-                apply_rule=self.rule_instance.rule_function,
-                r=self.r,
-            )
-        except Exception as e:
-            raise RuntimeError(f"Error running simulation.") from e
+        automaton_metadata_bytes = json.dumps(automaton_metadata).encode("utf-8")
+        return automaton_bytes, automaton_metadata_bytes
 
-        cpl.plot(ca)
-        return ca
+    def deserialize_automaton(
+        self, automaton_metadata_bytes: bytes, automaton_bytes: bytes
+    ) -> np.ndarray:
+        """
+        Deserialize the automaton and return the numpy array.
 
+        Args:
+            automaton_metadata_bytes (bytes): The serialized metadata of the automaton.
+            automaton_bytes (bytes): The serialized automaton.
 
-# Test rules with Simulate class
-if __name__ == "__main__":  #
-    initial_state = cpl.init_simple2d(60, 60)
-    # Rules
-    # rule_instance = ConwayRule()
-    # rule_instance = HighLifeRule()
-    # rule_instance = DayAndNightRule()
-    # rule_instance = Rule30()
-    # rule_instance = Rule110()
-    # rule_instance = FredkinRule() 
-    # rule_instance = BriansBrainRule()
-    rule_instance = SeedsRule() 
-    #
-    sim = Simulate(
-        initial_state,
-        timesteps=100,
-        rule_instance=rule_instance,
-        neighbourhood_type="Moore",
-        r=1,
-    )
-    result = sim.run()
-    print(result)
+        Returns:
+            np.ndarray: The deserialized automaton as a numpy array.
 
+        Raises:
+            ValueError: Data integrity error if the automaton hash does not match the hash in the metadata.
+        """
 
-# Test rules with Simulate1D class
-if __name__ == "__main__":
-    initial_state = cpl.init_simple(100)
-    rule_instance = Rule30()
-    sim = Simulate1D(
-        initial_state,
-        timesteps=100,
-        rule_instance=rule_instance,
-        r=1,
-    )
-    result = sim.run()
-    print(result)
+        automaton_metadata = json.loads(automaton_metadata_bytes.decode("utf-8"))
+        automaton_hash = hashlib.sha256(automaton_bytes).hexdigest()
+        if automaton_hash != automaton_metadata.get("hash", ""):
+            raise ValueError("Data integrity check failed!")
+
+        automaton = np.frombuffer(
+            automaton_bytes, dtype=np.dtype(automaton_metadata["dtype"])
+        )
+        automaton = automaton.reshape(automaton_metadata["shape"])
+
+        return automaton
+
+    def __str__(self):
+        return (
+            f"CAsynapse(array_bytes={self.array_bytes[:12]}, "
+            f"metadata_bytes={self.metadata_bytes[:12]}, "
+            f"automaton_bytes={self.automaton_bytes[:12]}, "
+            f"automaton_metadata_bytes={self.automaton_metadata_bytes[:12]}, "
+            f"axon={self.axon.dict()}, "
+            f"dendrite={self.dendrite.dict()}"
+        )
+  
