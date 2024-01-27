@@ -1,5 +1,5 @@
-bittensor==6.6.1
-torch==2.1.0
-cellpylib==2.4.0
-wandb
+bittensor
+torch
+cellpylib
 numpy
+wandb

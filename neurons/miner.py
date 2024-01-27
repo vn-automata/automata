@@ -16,51 +16,121 @@
 
 import time
 import typing
+import numpy as np
 import bittensor as bt
+import cellpylib as cpl
 
-# Bittensor Miner Template:
-import cell_automata
-
-# import base miner class which takes care of most of the boilerplate
-from cell_automata.miner.miner import BaseMinerNeuron
+import automata
+from automata.utils import rulesets
+from automata.miner.miner import BaseMinerNeuron
 
 
-class Miner(BaseMinerNeuron):
-    """
-    Your miner neuron class. You should use this class to define your miner's behavior. In particular, you should replace the forward function with your own logic. You may also want to override the blacklist and priority functions according to your needs.
+# Cellular automata initial state functions for testing.
+function_mapping = {
+    "cpl.init_simple": cpl.init_simple,
+    "cpl.init_simple2d": cpl.init_simple2d,
+    "cpl.init_random": cpl.init_random,
+    "cpl.init_random2d": cpl.init_random2d,
+}
 
-    This class inherits from the BaseMinerNeuron class, which in turn inherits from BaseNeuron. The BaseNeuron class takes care of routine tasks such as setting up wallet, subtensor, metagraph, logging directory, parsing config, etc. You can override any of the methods in BaseNeuron if you need to customize the behavior.
+# Cellular automata rule functions.
+rule_class_mapping = {
+    "Conway": rulesets.ConwayRule,
+    "HighLife": rulesets.HighLifeRule,
+    "DayAndNight": rulesets.DayAndNightRule,
+}
 
-    This class provides reasonable default behavior for a miner such as blacklisting unrecognized hotkeys, prioritizing requests based on stake, and forwarding requests to the forward function. If you need to define custom
-    """
 
+class miner(BaseMinerNeuron):
     def __init__(self, config=None):
-        super(Miner, self).__init__(config=config)
+        super(miner, self).__init__(config=config)
 
-        # TODO(developer): Anything specific to your use case you can do here
-
-    async def forward(
-        self, synapse: cell_automata.protocol.Dummy
-    ) -> cell_automata.protocol.Dummy:
+    def evolve_automata(
+        self,
+        initial_state: np.ndarray,
+        steps: int,
+        rule_instance: rulesets.Rule,
+        r: int,
+        neighbourhood_func: str,
+        memoize: str or bool or None,
+    ) -> np.ndarray:
         """
-        Processes the incoming 'Dummy' synapse by performing a predefined operation on the input data.
-        This method should be replaced with actual logic relevant to the miner's purpose.
+        Simulate a cellular automata with the given parameters.
 
         Args:
-            synapse (template.protocol.Dummy): The synapse object containing the 'dummy_input' data.
+            initial_state (NDArray): The initial state of the cellular automata.
+            timesteps (int): The number of timesteps to simulate.
+            rule_instance (rulesets.Rule): The rule to apply to the cellular automata.
+            r (int): The radius of the neighbourhood.
+            neighbourhood_type (str): The type of neighbourhood to use.
+            memoize (str): The memoization type to use.
 
         Returns:
-            template.protocol.Dummy: The synapse object with the 'dummy_output' field set to twice the 'dummy_input' value.
-
-        The 'forward' function is a placeholder and should be overridden with logic that is appropriate for
-        the miner's intended operation. This method demonstrates a basic transformation of input data.
+            NDArray: The evolved state of the cellular automata.
         """
-        # TODO(developer): Replace with actual implementation logic.
-        synapse.dummy_output = synapse.dummy_input * 2
+        bt.logging.trace(f"Simulating cellular automata with {steps} timesteps.")
+
+        automaton = cpl.evolve2d(
+            cellular_automaton=initial_state,
+            timesteps=steps,
+            apply_rule=rule_instance.apply_rule,
+            r=r,
+            neighbourhood=neighbourhood_func,
+            memoize=memoize,
+        )
+        return automaton
+
+    async def forward(
+        self, synapse: automata.protocol.CAsynapse
+    ) -> automata.protocol.CAsynapse:
+        # Receive simulation parameters from the validator.
+        (
+            initial_state,
+            steps,
+            neighbourhood_func,
+            rule_func,
+        ) = synapse.deserialize_parameters()
+
+        # Log the parameters.
+        bt.logging.info(
+            f"Received cellular automata request from {synapse.dendrite.hotkey}."
+        )
+        bt.logging.info(f"Inital state: {initial_state}")
+        bt.logging.info(f"Timesteps: {steps}")
+        bt.logging.info(f"Neighbourhood type: {neighbourhood_func}")
+        bt.logging.info(f"Rule function: {rule_func}")
+
+        # Map rule_func str to callable rule class dict.
+        rule_class_name = rule_func
+        rule_class = rule_class_mapping.get(rule_class_name, None)
+        if rule_class is None:
+            raise ValueError(f"Rule {rule_class_name} is not recognized.")
+        rule_instance = rule_class()
+
+        # Generate the cellular automata.
+        automaton = self.evolve_automata(
+            initial_state=initial_state,
+            timesteps=steps,
+            rule_instance=rule_instance.apply_rule,
+            r=1,
+            neighbourhood_type=neighbourhood_func,
+            memoize=None,
+        )
+        if automaton is None:
+            raise ValueError("Automaton could not be generated.")
+        else:
+            bt.logging.info(
+                f"Simulated cellular automata over {steps} timesteps with {rule_class_name}."
+            )
+
+        # Return the response to the validator.
+        automaton = automaton.tobytes()
+        synapse.automaton_bytes = automaton
+        bt.logging.info(f"Transmitting serialized automaton to {synapse.dendrite.hotkey}.")
         return synapse
 
     async def blacklist(
-        self, synapse: cell_automata.protocol.Dummy
+        self, synapse: automata.protocol.CAsynapse
     ) -> typing.Tuple[bool, str]:
         """
         Determines whether an incoming request should be blacklisted and thus ignored. Your implementation should
@@ -104,7 +174,7 @@ class Miner(BaseMinerNeuron):
         )
         return False, "Hotkey recognized!"
 
-    async def priority(self, synapse: cell_automata.protocol.Dummy) -> float:
+    async def priority(self, synapse: automata.protocol.CAsynapse) -> float:
         """
         The priority function determines the order in which requests are handled. More valuable or higher-priority
         requests are processed before others. You should design your own priority mechanism with care.
@@ -112,7 +182,7 @@ class Miner(BaseMinerNeuron):
         This implementation assigns priority to incoming requests based on the calling entity's stake in the metagraph.
 
         Args:
-            synapse (template.protocol.Dummy): The synapse object that contains metadata about the incoming request.
+            synapse (bt.Synapse): The synapse object that contains metadata about the incoming request.
 
         Returns:
             float: A priority score derived from the stake of the calling entity.
@@ -139,7 +209,7 @@ class Miner(BaseMinerNeuron):
 
 # This is the main function, which runs the miner.
 if __name__ == "__main__":
-    with Miner() as miner:
+    with miner() as miner:
         while True:
             bt.logging.info("Miner running...", time.time())
             time.sleep(5)

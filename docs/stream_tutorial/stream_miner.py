@@ -12,7 +12,7 @@ import bittensor as bt
 from transformers import GPT2Tokenizer
 from typing import List, Dict, Tuple, Union, Callable, Awaitable
 
-from cell_automata.protocol import StreamPrompting
+from automata.protocol import StreamPrompting
 from config import get_config, check_config
 
 
