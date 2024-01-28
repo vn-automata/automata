@@ -31,6 +31,34 @@ class ApplyRule(ABC):
         pass
 
 
+import numpy as np
+
+class InitialConditions:
+    def __init__(self, size: int, percentage: float):
+        self.size = size
+        self.percentage = percentage
+
+    def init_random_1d(self):
+        # Calculate the number of cells to be activated
+        num_cells = 1 #int(self.size * self.percentage)
+        # Create a flat array with the desired number of 1s and 0s
+        initial_state = np.array([1]*num_cells + [0]*(self.size - num_cells))
+        # Randomly shuffle the array. Maybe we dont want this, and can use cpl.init_random or cpl.init_simple
+        np.random.shuffle(initial_state)
+        return initial_state
+
+    def init_random_2d(self, rows: int, cols: int):
+        # Calculate the number of cells to be activated
+        num_cells = int(rows * cols * self.percentage)
+        # Create a flat array with the desired number of 1s and 0s
+        cells = np.array([1]*num_cells + [0]*(rows*cols - num_cells))
+        # Randomly shuffle the array
+        np.random.shuffle(cells)
+        # Reshape the array to the size of the grid
+        initial_state = cells.reshape(1, rows, cols)
+        return initial_state
+
+
 class ConwayRule(ApplyRule):
     """Implementation of Conway's Game of Life:
     a cellular automaton where a cell is "born" if it has exactly three neighbors,
@@ -83,7 +111,7 @@ class FredkinRule(ApplyRule):
     """
 
     def rule_function(self, n, c, t):
-        sum_n = sum(n)
+        sum_n = np.sum(n)
         return sum_n == 1 or c and sum_n == 2
 
 
@@ -93,13 +121,15 @@ class BriansBrainRule(ApplyRule):
     A live cell dies in the next generation, and a dead cell remains dead."""
 
     def rule_function(self, n, c, t):
-        sum_n = sum(n)
+        sum_n = np.sum(n)
         if c == 0 and sum_n == 2:
             return 1
         elif c == 1:
             return 2
         elif c == 2:
             return 0
+        else:
+            return 0  # or any other default value
 
 
 class SeedsRule(ApplyRule):
@@ -107,7 +137,7 @@ class SeedsRule(ApplyRule):
     and a cell "dies" otherwise."""
 
     def rule_function(self, n, c, t):
-        sum_n = sum(n)
+        sum_n = np.sum(n)
         return int(sum_n == 2)
 
 
@@ -225,16 +255,16 @@ class Simulate1D:
 
 # Test rules with Simulate class
 if __name__ == "__main__":  #
-    initial_state = cpl.init_simple2d(60, 60)
+    initial_state = init_random_2d(60, 60, 0.1)
     # Rules
-    # rule_instance = ConwayRule()
+    rule_instance = ConwayRule()
     # rule_instance = HighLifeRule()
     # rule_instance = DayAndNightRule()
     # rule_instance = Rule30()
     # rule_instance = Rule110()
     # rule_instance = FredkinRule() 
     # rule_instance = BriansBrainRule()
-    rule_instance = SeedsRule() 
+    #rule_instance = SeedsRule() 
     #
     sim = Simulate(
         initial_state,

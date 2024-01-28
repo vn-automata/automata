@@ -4,18 +4,21 @@ from numpy.typing import NDArray
 import cellpylib as cpl
 import bittensor as bt
 from abc import ABC, abstractmethod
-from protocol import *
+from rulesets import *
 import subprocess
 
 
 
-initial_state = cpl.init_simple(100)
+#initial_state = cpl.init_simple(100)
+#initial_state = cpl.init_random(100, 100)
+# Initialize a 1D initial state using the custom rulesets class
+ic = InitialConditions(100, 0.5)
+initial_state_1d = ic.init_random_1d()
 
-# Create an instance of ConwayRule
 rule_instance = Rule30()
 
-# Create an instance of Simulate with ConwayRule
-sim = Simulate1D(
+# Create an instance of Simulate
+sim = Simulate(
     initial_state,
     timesteps=100,
     rule_instance=rule_instance,
