@@ -6,20 +6,23 @@ import bittensor as bt
 from abc import ABC, abstractmethod
 from rulesets import *
 import subprocess
+import matplotlib
+matplotlib.use('Qt5Agg')  # 
 import matplotlib.pyplot as plt
 
-#initalize 1d
-initial_state = cpl.init_simple(100)
 #initialize 2d
-initial_state = cpl.init_simple2d(100, 100)
+ic = InitialConditions(100, 0.2)
+initial_state = ic.init_random_2d(100, 100)
+#initial_state = cpl.init_simple2d(60, 60)
+#initial_state[:, [28,29,30,30], [30,31,29,31]] = 1
 
-# Create an instance of ConwayRule
-#rule_instance = Rule30()
+# Create an instance of the rule to be applied
 rule_instance = ConwayRule()
-# Create an instance of Simulate with ConwayRule
+
+# Create an instance of Simulate
 sim = Simulate(
     initial_state,
-    timesteps=100,
+    timesteps=10,
     rule_instance=rule_instance,
     r=1,
 )
@@ -31,20 +34,22 @@ result = sim.run()
 print(result)
 
 # Visualize the result
-plt.imshow(result[-1], cmap='Greys')
+plt.imshow(result[-1], cmap='Blues')
 plt.show()
-#plt.savefig('`/root/automata1/sim_figs/simulation_result.png')
-plt.savefig('`/home/scottrobinson/Downloads/simulation_result.png')
-           #subprocess.run(['feh', '/root/automata1/sim_figs/simulation_result.png'])
+
+
 
 # Convert the numpy 2D array to ASCII art
-#initial_ascii = '\n'.join(''.join('.' if cell else '#' for cell in row) for row in initial_state[-1])
+inital_ascii2D = '\n'.join(''.join('.' if cell == 0 else '#' for cell in row) for state in initial_state for row in state)
+print(inital_ascii2D)
 #final_ascii = '\n'.join(''.join('.' if cell else '#' for cell in row) for row in result[-1])
 
-# Convert the numpy 1D array to ASCII artv for all timesteps
-final_ascii = '\n'.join(''.join('.' if cell else '#' for cell in row) for row in result)
+# Convert the numpy 2D array to ASCII art for end state
+final_ascii = '\n'.join(''.join('.' if cell else '#' for cell in row) for row in result[-1])
+print(final_ascii)
 
-
+# Or use your graphics card!
+cpl.plot2d_animate(result)
 
 
 # Print the ASCII art
