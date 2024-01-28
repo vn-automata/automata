@@ -41,28 +41,21 @@ class InitialConditions:
     def init_random_1d(self):
         # Calculate the number of cells to be activated
         num_cells = 1 #int(self.size * self.percentage)
-
         # Create a flat array with the desired number of 1s and 0s
         initial_state = np.array([1]*num_cells + [0]*(self.size - num_cells))
-
         # Randomly shuffle the array. Maybe we dont want this, and can use cpl.init_random or cpl.init_simple
         np.random.shuffle(initial_state)
-
         return initial_state
 
     def init_random_2d(self, rows: int, cols: int):
         # Calculate the number of cells to be activated
         num_cells = int(rows * cols * self.percentage)
-
         # Create a flat array with the desired number of 1s and 0s
         cells = np.array([1]*num_cells + [0]*(rows*cols - num_cells))
-
         # Randomly shuffle the array
         np.random.shuffle(cells)
-
         # Reshape the array to the size of the grid
         initial_state = cells.reshape(1, rows, cols)
-
         return initial_state
 
 
