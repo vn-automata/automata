@@ -27,16 +27,27 @@ class SingleStepInteractionTestCase(unittest.TestCase):
         self.miner_uids = get_random_uids(self, k=10)
 
     def test_run_single_step(self):
+        print("Starting single step interaction test...")
+
         # Simulate a query from the validator to the miner
+        print("Querying the miner...")
         responses = self.validator.dendrite.query(
             axons=[self.miner.axon_info for _ in self.miner_uids],
             synapse=Dummy(dummy_input="test_input"),
             deserialize=True,
         )
 
+        print("Checking responses...")
         # Check the response
         for response in responses:
             self.assertIsNotNone(response)  # Ensure we got a response
+            print(f"Received response: {response}")
+
+        # Example of printing additional information
+        print("Ruleset chosen: ExampleRuleset")
+        print("Neighborhood: ExampleNeighborhood")
+
+        print("Single step interaction test completed.")
 
 if __name__ == "__main__":
     unittest.main()
