@@ -49,9 +49,27 @@ class TemplateValidatorNeuronTestCase(unittest.TestCase):
         self.neuron = Validator(config)
         self.miner_uids = get_random_uids(self, k=10)
 
+        # Initialize the miner
+        miner_config = BaseNeuron.config()
+        miner_config.wallet._mock = True
+        miner_config.metagraph._mock = True
+        miner_config.subtensor._mock = True
+        self.miner = Miner(miner_config)
+
+
     def test_run_single_step(self):
-        # TODO: Test a single step
-        pass
+        # Simulate a query from the validator to the miner
+        responses = self.validator.dendrite.query(
+            axons=[self.miner.axon_info for _ in self.miner_uids],  # Assuming each UID maps to our single miner for simplicity
+            synapse=Dummy(dummy_input="test_input"),
+            deserialize=True,
+        )
+
+        # Check the response
+        for response in responses:
+            self.assertIsNotNone(response)  # Basic check to ensure we got a response
+            # Add more checks here as needed to validate the response
+
 
     def test_sync_error_if_not_registered(self):
         # TODO: Test that the validator throws an error if it is not registered on metagraph

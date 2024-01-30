@@ -29,6 +29,7 @@ from automata.utils.uids import get_random_uids
 from automata.validator import forward
 from automata.validator.reward import get_rewards, reward
 from automata.validator.validator import BaseValidatorNeuron
+from automata.utils import rulesets
 
 
 class Validator(BaseValidatorNeuron):
@@ -47,11 +48,16 @@ class Validator(BaseValidatorNeuron):
         steps = random.randint(50, 100)
 
         # Choose a random rule function. There should be a better way than adding new strings each time!
-        rule_funcs = [
-                "Conway",
-                "HighLife",
-                "DayAndNight",
-            ]
+        rule_funcs = {
+            "ConwayRule"
+            "HighLifeRule"
+            "DayAndNightRule"
+            "Rule30"
+            "Rule110"
+            "FredkinRule"
+            "BriansBrainRule"
+            "SeedsRule"
+}
         rule_func = random.choice(rule_funcs)
 
         # Choose a random neighborhood function. There should be a better way than adding new strings each time!

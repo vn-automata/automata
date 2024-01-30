@@ -35,9 +35,14 @@ function_mapping = {
 
 # Cellular automata rule functions.
 rule_class_mapping = {
-    "Conway": rulesets.ConwayRule,
-    "HighLife": rulesets.HighLifeRule,
-    "DayAndNight": rulesets.DayAndNightRule,
+    "ConwayRule": ConwayRule,
+    "HighLifeRule": HighLifeRule,
+    "DayAndNightRule": DayAndNightRule,
+    "Rule30": Rule30,
+    "Rule110": Rule110,
+    "FredkinRule": FredkinRule,
+    "BriansBrainRule": BriansBrainRule,
+    "SeedsRule": SeedsRule,
 }
 
 
