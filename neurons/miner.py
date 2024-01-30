@@ -14,124 +14,61 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
+import json
 import time
-import typing
-import numpy as np
+import base64
 import bittensor as bt
+import typing
 import cellpylib as cpl
 
-import automata
-from automata.utils import rulesets
+from automata.protocol import CAsynapse
+from automata.utils.rulesets import RuleFactory, Rule110, Rule30
 from automata.miner.miner import BaseMinerNeuron
 
 
-# Cellular automata initial state functions for testing.
-function_mapping = {
-    "cpl.init_simple": cpl.init_simple,
-    "cpl.init_simple2d": cpl.init_simple2d,
-    "cpl.init_random": cpl.init_random,
-    "cpl.init_random2d": cpl.init_random2d,
-}
-
-# Cellular automata rule functions.
-rule_class_mapping = {
-    "Conway": rulesets.ConwayRule,
-    "HighLife": rulesets.HighLifeRule,
-    "DayAndNight": rulesets.DayAndNightRule,
-}
-
-
-class miner(BaseMinerNeuron):
+class Miner(BaseMinerNeuron):
     def __init__(self, config=None):
-        super(miner, self).__init__(config=config)
+        super(Miner, self).__init__(config=config)
 
-    def evolve_automata(
-        self,
-        initial_state: np.ndarray,
-        steps: int,
-        rule_instance: rulesets.Rule,
-        r: int,
-        neighbourhood_func: str,
-        memoize: str or bool or None,
-    ) -> np.ndarray:
-        """
-        Simulate a cellular automata with the given parameters.
-
-        Args:
-            initial_state (NDArray): The initial state of the cellular automata.
-            timesteps (int): The number of timesteps to simulate.
-            rule_instance (rulesets.Rule): The rule to apply to the cellular automata.
-            r (int): The radius of the neighbourhood.
-            neighbourhood_type (str): The type of neighbourhood to use.
-            memoize (str): The memoization type to use.
-
-        Returns:
-            NDArray: The evolved state of the cellular automata.
-        """
-        bt.logging.trace(f"Simulating cellular automata with {steps} timesteps.")
-
-        automaton = cpl.evolve2d(
-            cellular_automaton=initial_state,
-            timesteps=steps,
-            apply_rule=rule_instance.apply_rule,
-            r=r,
-            neighbourhood=neighbourhood_func,
-            memoize=memoize,
-        )
-        return automaton
-
-    async def forward(
-        self, synapse: automata.protocol.CAsynapse
-    ) -> automata.protocol.CAsynapse:
-        # Receive simulation parameters from the validator.
-        (
-            initial_state,
-            steps,
-            neighbourhood_func,
-            rule_func,
-        ) = synapse.deserialize_parameters()
-
-        # Log the parameters.
+    async def forward(self, synapse: CAsynapse) -> CAsynapse:
+        # Log the receipt of the request from the validator.
         bt.logging.info(
-            f"Received cellular automata request from {synapse.dendrite.hotkey}."
+            f"Received request from {synapse.dendrite.hotkey}, Timesteps: {synapse.steps}, Rule: {synapse.rule_instance}"
         )
-        bt.logging.info(f"Inital state: {initial_state}")
-        bt.logging.info(f"Timesteps: {steps}")
-        bt.logging.info(f"Neighbourhood type: {neighbourhood_func}")
-        bt.logging.info(f"Rule function: {rule_func}")
 
-        # Map rule_func str to callable rule class dict.
-        rule_class_name = rule_func
-        rule_class = rule_class_mapping.get(rule_class_name, None)
-        if rule_class is None:
-            raise ValueError(f"Rule {rule_class_name} is not recognized.")
-        rule_instance = rule_class()
+        # TODO: Troubleshoot miner to get properly responding to validator & display final CA image to terminal.
+        # Retrieve the number of timesteps and the rule instance for the cellular automata simulation.
+        timesteps = synapse.steps
+        rule_name = synapse.rule_instance
+        rule_instance = RuleFactory.get_rule(rule_name)
 
-        # Generate the cellular automata.
-        automaton = self.evolve_automata(
-            initial_state=initial_state,
-            timesteps=steps,
-            rule_instance=rule_instance.apply_rule,
-            r=1,
-            neighbourhood_type=neighbourhood_func,
-            memoize=None,
+        # Initialize the cellular automata with a simple initial state.
+        initial_state = cpl.init_simple(100)
+
+        # Simulate the cellular automata.
+        ca = cpl.evolve(
+            initial_state, timesteps=timesteps, apply_rule=rule_instance.rule_function
         )
-        if automaton is None:
+
+        # Ensure the automaton was generated successfully.
+        if ca is None:
             raise ValueError("Automaton could not be generated.")
-        else:
-            bt.logging.info(
-                f"Simulated cellular automata over {steps} timesteps with {rule_class_name}."
-            )
 
-        # Return the response to the validator.
-        automaton = automaton.tobytes()
-        synapse.automaton_bytes = automaton
-        bt.logging.info(f"Transmitting serialized automaton to {synapse.dendrite.hotkey}.")
+        # Serialize the cellular automata data for return transmission.
+        serialized_ca = base64.b64encode(ca.tobytes()).decode("utf-8")
+        ca_data = json.dumps(
+            {
+                "array": serialized_ca,
+                "shape": ca.shape,
+                "dtype": str(ca.dtype),
+            }
+        )
+
+        # Attach the serialized cellular automata data to the synapse.
+        synapse.ca_data = ca_data
         return synapse
 
-    async def blacklist(
-        self, synapse: automata.protocol.CAsynapse
-    ) -> typing.Tuple[bool, str]:
+    async def blacklist(self, synapse: CAsynapse) -> typing.Tuple[bool, str]:
         """
         Determines whether an incoming request should be blacklisted and thus ignored. Your implementation should
         define the logic for blacklisting requests based on your needs and desired security parameters.
@@ -174,7 +111,7 @@ class miner(BaseMinerNeuron):
         )
         return False, "Hotkey recognized!"
 
-    async def priority(self, synapse: automata.protocol.CAsynapse) -> float:
+    async def priority(self, synapse: CAsynapse) -> float:
         """
         The priority function determines the order in which requests are handled. More valuable or higher-priority
         requests are processed before others. You should design your own priority mechanism with care.
@@ -209,7 +146,7 @@ class miner(BaseMinerNeuron):
 
 # This is the main function, which runs the miner.
 if __name__ == "__main__":
-    with miner() as miner:
+    with Miner() as miner:
         while True:
             bt.logging.info("Miner running...", time.time())
             time.sleep(5)

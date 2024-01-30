@@ -24,8 +24,7 @@ import bittensor as bt
 from typing import List
 from traceback import print_exception
 
-from automata.protocol import spec_version
-from automata.miner.config import check_config, add_args, config
+from automata import __spec_version__ as spec_version
 from automata.miner.neuron import BaseNeuron
 
 
@@ -47,6 +46,7 @@ class BaseValidatorNeuron(BaseNeuron):
         # Set up initial scoring weights for validation
         bt.logging.info("Building validation weights.")
         self.scores = torch.zeros_like(self.metagraph.S, dtype=torch.float32)
+        self.moving_averaged_scores = torch.zeros_like(self.scores, dtype=torch.float32)
 
         # Init sync with the network. Updates the metagraph.
         self.sync()

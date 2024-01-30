@@ -1,24 +1,80 @@
-# The MIT License (MIT)
-
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
-# documentation files (the “Software”), to deal in the Software without restriction, including without limitation
-# the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
-# and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of
-# the Software.
-
-# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
-# THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-# THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-# DEALINGS IN THE SOFTWARE.
-
+import base64
+import json
+import random
+from time import sleep
+import numpy as np
 import bittensor as bt
 
-from automata.protocol import Dummy
+from automata.protocol import CAsynapse
 from automata.validator.reward import get_rewards
-from automata.utils.uids import get_random_uids
+from automata.utils.uids import get_random_uids, check_uid_availability
+
+
+def get_random_params():
+    steps = random.randint(10, 20)
+    rule_instances = ["Rule30", "Rule110"]
+    rule_instance = random.choice(rule_instances)
+    bt.logging.info(f"CA parameters: Steps: {steps}, Rule: {rule_instance}")
+    return steps, rule_instance
+
+
+def query_automata_miners(self, steps, rule_instance):
+    # TODO: Finetune miner query method.
+    responses = []
+    miner_uids = []
+    try:
+        check_uid_availability(
+            metagraph=self.metagraph,
+            uid=1,
+            vpermit_tao_limit=self.config.neuron.vpermit_tao_limit,
+        )
+        population_size = len(self.metagraph.axons)
+        sample_size = min(self.config.neuron.sample_size, population_size)
+
+        if sample_size <= 0:
+            bt.logging.error(f"Sample size is zero, cannot query automata miners.")
+            return responses, miner_uids  # Return empty responses and miner uids.
+
+        miner_uids = get_random_uids(self, k=sample_size)
+        bt.logging.debug(f"Miner uids: {miner_uids}")
+
+        query_responses = self.dendrite.query(
+            axons=[self.metagraph.axons[uid] for uid in miner_uids],
+            synapse=CAsynapse(
+                steps=steps,
+                rule_instance=rule_instance,
+            ),
+            deserialize=True,
+        )
+
+        if query_responses is None:
+            raise ValueError("Responses are None, cannot compute scores.")
+        else:
+            responses = query_responses  # Update only if responses are not None.
+
+    except Exception as e:
+        bt.logging.error(f"Failed to query automata miners: {e}")
+        sleep(30)  # Wait for 5 seconds before retrying.
+
+    return responses, miner_uids  # Always return an iterable, even if empty.
+
+
+def compute_scores(self, responses):
+    try:
+        # TODO: Implement actual scoring & reward logic.
+        outputs = [response.payload for response in responses]
+        bt.logging.info(f"Received responses: {outputs}")
+        scores = [1 for _ in outputs]
+        total_score = np.sum(scores)
+        if total_score == 0:
+            raise ValueError(
+                "Total score for responses is zero, cannot compute relative scores."
+            )
+        scores = np.array(scores) / total_score
+        return scores
+    except Exception as e:
+        bt.logging.error(f"Failed to compute scores: {e}")
+        raise
 
 
 async def forward(self):
@@ -31,28 +87,29 @@ async def forward(self):
         self (:obj:`bittensor.neuron.Neuron`): The neuron object which contains all the necessary state for the validator.
 
     """
-    # TODO(developer): Define how the validator selects a miner to query, how often, etc.
-    # get_random_uids is an example method, but you can replace it with your own.
-    miner_uids = get_random_uids(self, k=self.config.neuron.sample_size)
+    self.sync()
+    steps, rule_instance = get_random_params()
+    try:
+        # Query miners.
+        responses, miner_uids = query_automata_miners(self, steps, rule_instance)
 
-    # The dendrite client queries the network.
-    responses = self.dendrite.query(
-        # Send the query to selected miner axons in the network.
-        axons=[self.metagraph.axons[uid] for uid in miner_uids],
-        # Construct a dummy query. This simply contains a single integer.
-        synapse=Dummy(dummy_input=self.step),
-        # All responses have the deserialize function called on them before returning.
-        # You are encouraged to define your own deserialization function.
-        deserialize=True,
-    )
+        # Check if responses are None
+        if responses is None:
+            raise ValueError("Responses are None, cannot compute scores.")
 
-    # Log the results for monitoring purposes.
-    bt.logging.info(f"Received responses: {responses}")
+        bt.logging.info(f"Responses: {responses}")
+        rewards = get_rewards(self, query=steps, responses=responses)
+        bt.logging.info(f"Scored responses: {rewards}")
 
-    # TODO(developer): Define how the validator scores responses.
-    # Adjust the scores based on responses from miners.
-    rewards = get_rewards(self, query=self.step, responses=responses)
+        # Compute scores.
+        scores = compute_scores(self, responses)
+        bt.logging.info(f"Computed scores: {scores}")
 
-    bt.logging.info(f"Scored responses: {rewards}")
-    # Update the scores based on the rewards. You may want to define your own update_scores function for custom behavior.
-    self.update_scores(rewards, miner_uids)
+        # Update scores and save state.
+        self.update_scores(miner_uids, scores)
+        self.save_state()
+
+    except Exception as e:
+        bt.logging.error(f"Error in forward process: {e}")
+        return None
+    return responses

@@ -23,7 +23,7 @@ import bittensor as bt
 from abc import ABC, abstractmethod
 
 # Sync calls set weights and also resyncs the metagraph.
-from . import check_config, add_args, config
+from automata.utils.config import check_config, add_args, config
 from automata.utils.misc import ttl_get_block
 from automata import __spec_version__ as spec_version
 
