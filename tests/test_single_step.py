@@ -2,7 +2,7 @@
 import unittest
 from neurons.validator import Neuron as Validator
 from neurons.miner import Neuron as Miner
-from automata.protocol import Dummy
+from automata.protocol *
 from automata.utils.uids import get_random_uids
 from automata.validator.validator import BaseValidatorNeuron
 from bittensor import config as btconfig
@@ -17,7 +17,8 @@ class SingleStepInteractionTestCase(unittest.TestCase):
         self.validator = Validator(validator_config)
 
         # Miner setup
-        miner_config = btconfig()  # Assuming a similar config method exists for the miner
+        #TODO: check this
+        miner_config = btconfig()  # Assuming a similar config method exists for the miner??
         miner_config.wallet._mock = True
         miner_config.metagraph._mock = True
         miner_config.subtensor._mock = True
@@ -30,6 +31,7 @@ class SingleStepInteractionTestCase(unittest.TestCase):
         print("Starting single step interaction test...")
 
         # Simulate a query from the validator to the miner
+        #TODO: replace Dummy
         print("Querying the miner...")
         responses = self.validator.dendrite.query(
             axons=[self.miner.axon_info for _ in self.miner_uids],
@@ -43,7 +45,7 @@ class SingleStepInteractionTestCase(unittest.TestCase):
             self.assertIsNotNone(response)  # Ensure we got a response
             print(f"Received response: {response}")
 
-        # Example of printing additional information
+        #TODO: printing additional information
         print("Ruleset chosen: ExampleRuleset")
         print("Neighborhood: ExampleNeighborhood")
 
