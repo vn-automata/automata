@@ -47,6 +47,10 @@ class InitialConditions:
         np.random.shuffle(initial_state)
         return initial_state
 
+    def init_simple_1d(self):
+        # Use cpl library as a shortcut
+        return = cpl.init_simple(self.size)
+
     def init_random_2d(self, rows: int, cols: int):
         # Calculate the number of cells to be activated
         num_cells = int(rows * cols * self.percentage)
@@ -57,6 +61,10 @@ class InitialConditions:
         # Reshape the array to the size of the grid
         initial_state = cells.reshape(1, rows, cols)
         return initial_state
+
+    def init_simple_2d(self):
+        # use cpl library as a shortcut
+        return cpl.init_simple2d(rows, cols)
 
 
 class ConwayRule(ApplyRule):
@@ -90,19 +98,49 @@ class DayAndNightRule(ApplyRule):
 
 
 class Rule30(ApplyRule):
-    """Implementation of a one-dimensional cellular automaton rule introduced by Stephen Wolfram,
+    """Class 3. Implementation of a one-dimensional cellular automaton rule introduced by Stephen Wolfram, dubbed rule number 30 based on binary.
     known for its chaotic behavior."""
 
     def rule_function(self, n: NDArray, c: int, t: int) -> int:
         return cpl.nks_rule(n, 30)
 
 
+class Rule54(ApplyRule):
+    """Class 3. Implementation of a 1D CA rule with rule number 54.
+    This rule is known for its complex and chaotic behavior, making it an interesting choice for simulating complex systems and generating intricate patterns."""
+
+    def rule_function(self, n: NDArray, c: int, t: int) -> int:
+        return cpl.nks_rule(n, 54)
+
+class Rule62(ApplyRule):
+    """Class 4. Implementation of a 1D CA rule with rule number 62.
+    Rule 62 exhibits unique behavior, can be used to study the emergence of complex patterns and structures in cellular automata simulations."""
+
+    def rule_function(self, n: NDArray, c: int, t: int) -> int:
+        return cpl.nks_rule(n, 62)
+
+
 class Rule110(ApplyRule):
-    """Implementation of Rule 110: It's another one-dimensional cellular automaton rule,
-    introduced by Stephen Wolfram. It's known for being Turing complete."""
+    """Class 3/4. Implementation of a 1D CA rule with rule number 110.
+    Rule 110 noteably has the ability to simulate a universal Turing machine, making it a fundamental rule in the study of computational universality."""
 
     def rule_function(self, n: NDArray, c: int, t: int) -> int:
         return cpl.nks_rule(n, 110)
+
+
+class Rule124(ApplyRule):
+    """Class 4. Implementation of a 1D CA rule with rule number 124.
+    Rule 124 is known for its interesting and intricate behavior, often used to explore the emergence of complex patterns. Often used for CA art-generation"""
+
+    def rule_function(self, n: NDArray, c: int, t: int) -> int:
+        return cpl.nks_rule(n, 124)
+
+class Rule126(ApplyRule):
+    """Class 4. Implementation of a 1D CA rule with rule number 126.
+    Rule 126 is recognized for its unique emergent generation propoerties."""
+
+    def rule_function(self, n: NDArray, c: int, t: int) -> int:
+        return cpl.nks_rule(n, 126)
 
 
 class FredkinRule(ApplyRule):
